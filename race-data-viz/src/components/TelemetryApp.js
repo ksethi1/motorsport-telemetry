@@ -1,33 +1,39 @@
 import React, { useEffect, useState, useRef } from 'react';
 import * as d3 from 'd3';
+import { renderDualTelemetryCursor } from './TelemetryOverlap';
 
-// Main component that loads telemetry data and renders both the track map and graphs
 export default function TelemetryViewer() {
-  const [data, setData] = useState([]);
+  const [slowData, setSlowData] = useState([]);
+  const [fastData, setFastData] = useState([]);
   const [hoverIndex, setHoverIndex] = useState(null);
   const [selectedMapMetric, setSelectedMapMetric] = useState('Speed');
   const [selectedGraphMetrics, setSelectedGraphMetrics] = useState(['Speed', 'Throttle', 'RPM']);
+  const [focus, setFocus] = useState('slow');
   const containerRef = useRef();
 
-  // Fetch telemetry data once when component mounts
   useEffect(() => {
-    fetch('/data/telemetry_full.json')
-      .then(res => res.json())
-      .then(setData);
+    Promise.all([
+      fetch('/data/slowest_lap.json').then(res => res.json()),
+      fetch('/data/fastest_lap.json').then(res => res.json())
+    ]).then(([slow, fast]) => {
+      setSlowData(slow.telemetry);
+      setFastData(fast.telemetry);
+    });
   }, []);
 
-  if (!data.length) return <div>Loading...</div>;
+  if (!slowData.length || !fastData.length) return <div>Loading...</div>;
 
   const width = 400;
   const height = 500;
   const padding = 40;
 
-  const lons = data.map(p => p.Lon);
-  const lats = data.map(p => p.Lat);
+  const focusedData = focus === 'slow' ? slowData : fastData;
+  const allData = [...slowData, ...fastData];
+  const lons = allData.map(p => p.Lon);
+  const lats = allData.map(p => p.Lat);
   const lonRange = d3.extent(lons);
   const latRange = d3.extent(lats);
 
-  // Calculate scale and center for projection based on GPS bounds
   const scale = Math.min(
     (width - 2 * padding) / (lonRange[1] - lonRange[0]),
     (height - 2 * padding) / (latRange[1] - latRange[0])
@@ -36,18 +42,16 @@ export default function TelemetryViewer() {
   const lonCenter = (lonRange[0] + lonRange[1]) / 2;
   const latCenter = (latRange[0] + latRange[1]) / 2;
 
-  // Project Lon/Lat to SVG x/y coordinates
   const project = (lon, lat) => {
     const x = (lon - lonCenter) * scale + width / 2;
     const y = height / 2 - (lat - latCenter) * scale;
     return [x, y];
   };
 
-  // Find the closest data point to a mouse x/y coordinate
   const findClosestIndex = (x, y) => {
     let minDist = Infinity;
     let closest = null;
-    data.forEach((d, i) => {
+    focusedData.forEach((d, i) => {
       const [px, py] = project(d.Lon, d.Lat);
       const dist = Math.hypot(px - x, py - y);
       if (dist < minDist) {
@@ -58,19 +62,20 @@ export default function TelemetryViewer() {
     return closest;
   };
 
-  // Extract numeric telemetry metrics to show in dropdowns
-  const metrics = Object.keys(data[0]).filter(k => typeof data[0][k] === 'number' && !['Lon', 'Lat'].includes(k));
-
-  // Color scale based on selected map metric
-  const metricExtent = d3.extent(data, d => d[selectedMapMetric]);
+  const metrics = Object.keys(slowData[0]).filter(k => typeof slowData[0][k] === 'number' && !['Lon', 'Lat'].includes(k));
+  const metricExtent = d3.extent([...slowData, ...fastData], d => d[selectedMapMetric]);
   const colorScale = d3.scaleLinear()
     .domain([metricExtent[0], (metricExtent[0] + metricExtent[1]) / 2, metricExtent[1]])
     .range(['yellow', 'orange', 'red']);
 
+  const formatRange = (min, max) => `${Math.round(min)}–${Math.round(max)} ${getUnits(selectedMapMetric)}`;
+  const rangeLow = formatRange(metricExtent[0], (metricExtent[0] + metricExtent[1]) / 3);
+  const rangeMid = formatRange((metricExtent[0] + metricExtent[1]) / 3, (2 * metricExtent[0] + metricExtent[1]) / 3);
+  const rangeHigh = formatRange((2 * metricExtent[0] + metricExtent[1]) / 3, metricExtent[1]);
+
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
+    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {/* Dropdown to select heatmap metric */}
         <div style={{ padding: 10 }}>
           <label style={{ fontSize: 14, fontWeight: 'bold', marginRight: 8 }}>Track Map Metric:</label>
           <select value={selectedMapMetric} onChange={e => setSelectedMapMetric(e.target.value)}>
@@ -78,10 +83,9 @@ export default function TelemetryViewer() {
           </select>
         </div>
 
-        {/* Track map with heatmap overlay and hover tracking */}
         <div
           ref={containerRef}
-          style={{ width: width, height: height, background: 'white', border: '1px solid #ccc', cursor: 'pointer', position: 'relative' }}
+          style={{ width, height, background: 'white', border: '1px solid #ccc', cursor: 'pointer', position: 'relative' }}
           onMouseMove={(e) => {
             const rect = containerRef.current.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -92,43 +96,45 @@ export default function TelemetryViewer() {
           onMouseLeave={() => setHoverIndex(null)}
         >
           <svg width={width} height={height}>
-            {/* Draw green line from start to finish */}
             {(() => {
-              const [x1, y1] = project(data[0].Lon, data[0].Lat);
-              const [x2, y2] = project(data[data.length - 1].Lon, data[data.length - 1].Lat);
+              const [x1, y1] = project(slowData[0].Lon, slowData[0].Lat);
+              const [x2, y2] = project(slowData[slowData.length - 1].Lon, slowData[slowData.length - 1].Lat);
               return (
                 <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="green" strokeWidth={2} />
               );
             })()}
 
-            {/* Plot track as color-coded dots */}
-            {data.map((p, i) => {
+            {[...slowData, ...fastData].map((p, i) => {
               const [x, y] = project(p.Lon, p.Lat);
-              const isActive = i === hoverIndex;
               const fill = colorScale(p[selectedMapMetric]);
               return (
-                <circle
-                  key={i}
-                  cx={x}
-                  cy={y}
-                  r={isActive ? 3 : 1.5}
-                  fill={fill}
-                  stroke={isActive ? 'black' : 'none'}
-                />
+                <circle key={i} cx={x} cy={y} r={1.5} fill={fill} />
               );
             })}
+
+            {hoverIndex !== null && renderDualTelemetryCursor(hoverIndex, slowData, fastData, project)}
           </svg>
 
-          {/* Heatmap legend for the track map */}
           <div style={{ position: 'absolute', bottom: 10, left: 10, background: '#fff', padding: '4px 8px', border: '1px solid #ccc', fontSize: 12 }}>
-            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'red', marginRight: 4 }}></span>High ({Math.round(metricExtent[1])} {getUnits(selectedMapMetric)})</div>
-            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'orange', marginRight: 4 }}></span>Mid ({Math.round((metricExtent[0] + metricExtent[1]) / 2)} {getUnits(selectedMapMetric)})</div>
-            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'yellow', marginRight: 4 }}></span>Low ({Math.round(metricExtent[0])} {getUnits(selectedMapMetric)})</div>
+            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'red', marginRight: 4 }}></span>{rangeHigh}</div>
+            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'orange', marginRight: 4 }}></span>{rangeMid}</div>
+            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'yellow', marginRight: 4 }}></span>{rangeLow}</div>
           </div>
+
+          <div style={{ position: 'absolute', top: 10, left: 10, fontSize: 12 }}>
+            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'blue', marginRight: 4 }}></span>Racer 1</div>
+            <div><span style={{ display: 'inline-block', width: 12, height: 12, background: 'green', marginRight: 4 }}></span>Racer 2</div>
+          </div>
+
+          <button
+            onClick={() => setFocus(focus === 'slow' ? 'fast' : 'slow')}
+            style={{ position: 'absolute', bottom: 10, right: 10, padding: '6px 10px', background: '#444', color: 'white', border: 'none', borderRadius: 4 }}
+          >
+            Switch Focus ({focus === 'slow' ? 'Racer 1' : 'Racer 2'})
+          </button>
         </div>
       </div>
 
-      {/* Graphs for selected metrics */}
       <div style={{ flex: 1, padding: '20px', overflowY: 'scroll' }}>
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 14, fontWeight: 'bold', marginRight: 8 }}>Graph Metrics:</label>
@@ -143,11 +149,12 @@ export default function TelemetryViewer() {
         </div>
 
         {selectedGraphMetrics.map(metric => (
-          <MetricGraph
+          <DualMetricGraph
             key={metric}
-            data={data}
             metric={metric}
             hoverIndex={hoverIndex}
+            slowData={slowData}
+            fastData={fastData}
           />
         ))}
       </div>
@@ -155,68 +162,55 @@ export default function TelemetryViewer() {
   );
 }
 
-/**
- * Render a time-series line graph for the given metric
- * @param {Array} data - telemetry data array
- * @param {string} metric - metric to plot
- * @param {number|null} hoverIndex - current hover index
- */
-function MetricGraph({ data, metric, hoverIndex }) {
-  const width = 600;
-  const height = 150;
+function DualMetricGraph({ metric, hoverIndex, slowData, fastData }) {
+  const width = 800;
+  const height = 200;
   const padding = 40;
   const yAxisRef = useRef(null);
+  const xAxisRef = useRef(null);
 
   const x = d3.scaleLinear()
-    .domain([0, data.length - 1])
+    .domain([0, Math.max(slowData.length, fastData.length) - 1])
     .range([padding, width - padding]);
 
   const y = d3.scaleLinear()
-    .domain(d3.extent(data, d => d[metric]))
+    .domain(d3.extent([...slowData, ...fastData], d => d[metric]))
     .range([height - padding, padding]);
 
-  const line = d3.line()
-    .x((d, i) => x(i))
-    .y(d => y(d[metric]));
+  const lineSlow = d3.line().x((d, i) => x(i)).y(d => y(d[metric]));
+  const lineFast = d3.line().x((d, i) => x(i)).y(d => y(d[metric]));
 
-  // Draw y-axis ticks on metric change
   useEffect(() => {
     if (yAxisRef.current) {
       const yAxis = d3.axisLeft(y).ticks(4);
       d3.select(yAxisRef.current).call(yAxis);
     }
-  }, [y]);
+    if (xAxisRef.current) {
+      const xAxis = d3.axisBottom(x).ticks(5).tickFormat(d => `${(d * 0.05).toFixed(1)}s`);
+      d3.select(xAxisRef.current).call(xAxis);
+    }
+  }, [y, x]);
 
   return (
-    <svg width={width} height={height} style={{ marginBottom: '20px', background: '#f9f9f9', border: '1px solid #ccc' }}>
+    <svg width={width} height={height} style={{ marginBottom: '30px', background: '#f9f9f9', border: '1px solid #ccc' }}>
       <g ref={yAxisRef} transform={`translate(${padding},0)`} />
-      <path
-        d={line(data)}
-        fill="none"
-        stroke="steelblue"
-        strokeWidth={1.5}
-      />
+      <g ref={xAxisRef} transform={`translate(0,${height - padding})`} />
+      <path d={lineSlow(slowData)} fill="none" stroke="blue" strokeWidth={1.5} />
+      <path d={lineFast(fastData)} fill="none" stroke="green" strokeWidth={1.5} />
       {hoverIndex !== null && (
-        <circle
-          cx={x(hoverIndex)}
-          cy={y(data[hoverIndex][metric])}
-          r={4}
-          fill="red"
-        />
+        <>
+          <circle cx={x(hoverIndex)} cy={y(slowData[hoverIndex]?.[metric])} r={4} fill="blue" />
+          <circle cx={x(hoverIndex)} cy={y(fastData[hoverIndex]?.[metric])} r={4} fill="green" />
+        </>
       )}
       <text x={padding} y={20} fontSize={14} fill="#333">{metric} ({getUnits(metric)})</text>
     </svg>
   );
 }
 
-/**
- * Return units for a given telemetry metric
- * @param {string} metric - metric name
- * @returns {string} units of the metric
- */
 function getUnits(metric) {
   switch (metric) {
-    case 'Speed': return 'm/s';
+    case 'Speed': return 'km/h';
     case 'Throttle': return '%';
     case 'RPM': return 'rpm';
     default: return '';
