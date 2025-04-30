@@ -25,7 +25,7 @@ Response:
 ]
 ```
 
-### 2. `GET /api/tracks/{folder}`
+### 2. `GET /api/tracks/{track_name}`
 
 **Description**: Lists all telemetry files for a specific track.
 
@@ -47,7 +47,7 @@ Response:
 ]
 ```
 
-### 3. GET /api/tracks/{folder}/{file_name}
+### 3. GET /api/tracks/{track_name}/{player_name}
 
 **Description**: Downloads the specified telemetry, CSV file for the given track.
 
