@@ -8,9 +8,21 @@ const GOOGLE_MAPS_API_KEY = "XXXXXXXXXXXX"; // <-- CHANGE TO YOUR API KEY (Joey)
 
 // Define keys to map raw telemetry array data to objects
 const DATA_KEYS = [
-  "Speed", "LapDistPct", "Lat", "Lon", "Brake", "Throttle", "RPM",
-  "SteeringWheelAngle", "Gear", "Clutch", "ABSActive", "DRSActive",
-  "LatAccel", "Yaw", "PositionType"
+  "Speed",
+  "LapDistPct",
+  "Lat",
+  "Lon",
+  "Brake",
+  "Throttle",
+  "RPM",
+  "SteeringWheelAngle",
+  "Gear",
+  "Clutch",
+  "ABSActive",
+  "DRSActive",
+  "LatAccel",
+  "Yaw",
+  "PositionType",
 ];
 
 export default function TelemetryViewer() {
@@ -30,7 +42,9 @@ export default function TelemetryViewer() {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [selectedMapMetric, setSelectedMapMetric] = useState("Speed");
   const [selectedGraphMetrics, setSelectedGraphMetrics] = useState([
-    "Speed", "Throttle", "RPM"
+    "Throttle",
+    "Speed",
+    "Brake",
   ]);
   const [focus, setFocus] = useState("racer1");
 
@@ -39,16 +53,20 @@ export default function TelemetryViewer() {
   // Parse array of values to named object using DATA_KEYS
   const parseData = (raw) =>
     raw.map((row) =>
-      Object.fromEntries(DATA_KEYS.map((key, i) => [key, row[i]]))
+      Object.fromEntries(
+        DATA_KEYS.map((key, i) => [
+          key,
+          key === "Speed" ? row[i] * 2.24 : row[i], // Convert Speed from m/s to mph
+        ]),
+      ),
     );
 
-
   // Format and compute the lap time for focused racer
-  const computeFrameTime = (data, step = 1/60) =>
-  data.map((d, i) => ({
-    time: i * step,
-    lapPct: d.LapDistPct,
-  }));
+  const computeFrameTime = (data, step = 1 / 60) =>
+    data.map((d, i) => ({
+      time: i * step,
+      lapPct: d.LapDistPct,
+    }));
 
   const formatTime = (t) => {
     const minutes = Math.floor(t / 60);
@@ -58,8 +76,6 @@ export default function TelemetryViewer() {
     }
     return `${seconds.toFixed(2)}s`;
   };
-  
-
 
   // Load list of tracks on mount
   useEffect(() => {
@@ -72,7 +88,9 @@ export default function TelemetryViewer() {
   // Load players for selected track
   useEffect(() => {
     if (selectedTrack) {
-      fetch(`https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}`)
+      fetch(
+        `https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}`,
+      )
         .then((res) => res.json())
         .then(setPlayers)
         .catch((err) => console.error("Error fetching players:", err));
@@ -82,7 +100,9 @@ export default function TelemetryViewer() {
   // Load player 1 telemetry
   useEffect(() => {
     if (selectedTrack && player1) {
-      fetch(`https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}/${encodeURIComponent(player1)}`)
+      fetch(
+        `https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}/${encodeURIComponent(player1)}`,
+      )
         .then((res) => res.json())
         .then((data) => setPlayer1Data(parseData(data)))
         .catch((err) => console.error("Error fetching Player 1 data:", err));
@@ -92,7 +112,9 @@ export default function TelemetryViewer() {
   // Load player 2 telemetry
   useEffect(() => {
     if (selectedTrack && player2) {
-      fetch(`https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}/${encodeURIComponent(player2)}`)
+      fetch(
+        `https://dv-telemetry-load.azurewebsites.net/api/tracks/${encodeURIComponent(selectedTrack)}/${encodeURIComponent(player2)}`,
+      )
         .then((res) => res.json())
         .then((data) => setPlayer2Data(parseData(data)))
         .catch((err) => console.error("Error fetching Player 2 data:", err));
@@ -120,7 +142,7 @@ export default function TelemetryViewer() {
     lonRange[1] && latRange[0] && latRange[1]
       ? Math.min(
           (width - 2 * padding) / (lonRange[1] - lonRange[0]),
-          (height - 2 * padding) / (latRange[1] - latRange[0])
+          (height - 2 * padding) / (latRange[1] - latRange[0]),
         )
       : 1;
 
@@ -168,7 +190,8 @@ export default function TelemetryViewer() {
   const metrics =
     racer1Data[0] &&
     Object.keys(racer1Data[0]).filter(
-      (k) => typeof racer1Data[0][k] === "number" && !["Lon", "Lat"].includes(k)
+      (k) =>
+        typeof racer1Data[0][k] === "number" && !["Lon", "Lat"].includes(k),
     );
 
   // Color mapping for metric values on map
@@ -178,62 +201,85 @@ export default function TelemetryViewer() {
     .domain([
       metricExtent[0],
       (metricExtent[0] + metricExtent[1]) / 2,
-      metricExtent[1]
+      metricExtent[1],
     ])
     .range(["yellow", "orange", "red"]);
 
-    const formatRange = (min, max) => {
-      const format = (v) => {
-        if (Math.abs(max - min) < 5) return v.toFixed(2);     // narrow range
-        if (Math.abs(max - min) < 20) return v.toFixed(1);     // moderate range
-        return Math.round(v);                                  // wide range
-      };
-      return `${format(min)}–${format(max)} ${getUnits(selectedMapMetric)}`;
-    };    
+  const formatRange = (min, max) => {
+    const format = (v) => {
+      if (Math.abs(max - min) < 5) return v.toFixed(2); // narrow range
+      if (Math.abs(max - min) < 20) return v.toFixed(1); // moderate range
+      return Math.round(v); // wide range
+    };
+    return `${format(min)}–${format(max)} ${getUnits(selectedMapMetric)}`;
+  };
   const rangeLow = formatRange(
     metricExtent[0],
-    (metricExtent[0] + metricExtent[1]) / 3
+    (metricExtent[0] + metricExtent[1]) / 3,
   );
   const rangeMid = formatRange(
     (metricExtent[0] + metricExtent[1]) / 3,
-    (2 * metricExtent[0] + metricExtent[1]) / 3
+    (2 * metricExtent[0] + metricExtent[1]) / 3,
   );
   const rangeHigh = formatRange(
     (2 * metricExtent[0] + metricExtent[1]) / 3,
-    metricExtent[1]
+    metricExtent[1],
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       {/* Sidebar for track + player selection + map */}
       <div style={{ display: "flex", flexDirection: "column" }}>
         {/* Dropdowns */}
         <label>
           Select Track:
-          <select value={selectedTrack} onChange={(e) => setSelectedTrack(e.target.value)}>
+          <select
+            value={selectedTrack}
+            onChange={(e) => setSelectedTrack(e.target.value)}
+          >
             <option value="">--Select a Track--</option>
             {tracks.map((track) => (
-              <option key={track} value={track}>{track}</option>
+              <option key={track} value={track}>
+                {track}
+              </option>
             ))}
           </select>
         </label>
 
         <label>
           Select Player 1:
-          <select value={player1} onChange={(e) => setPlayer1(e.target.value)} disabled={!selectedTrack}>
+          <select
+            value={player1}
+            onChange={(e) => setPlayer1(e.target.value)}
+            disabled={!selectedTrack}
+          >
             <option value="">--Select Player 1--</option>
             {players.map((player) => (
-              <option key={player} value={player}>{player}</option>
+              <option key={player} value={player}>
+                {player}
+              </option>
             ))}
           </select>
         </label>
 
         <label>
           Select Player 2:
-          <select value={player2} onChange={(e) => setPlayer2(e.target.value)} disabled={!selectedTrack}>
+          <select
+            value={player2}
+            onChange={(e) => setPlayer2(e.target.value)}
+            disabled={!selectedTrack}
+          >
             <option value="">--Select Player 2--</option>
             {players.map((player) => (
-              <option key={player} value={player}>{player}</option>
+              <option key={player} value={player}>
+                {player}
+              </option>
             ))}
           </select>
         </label>
@@ -242,12 +288,19 @@ export default function TelemetryViewer() {
         {metrics && (
           <>
             <div style={{ padding: 10 }}>
-              <label style={{ fontSize: 14, fontWeight: "bold", marginRight: 8 }}>
+              <label
+                style={{ fontSize: 14, fontWeight: "bold", marginRight: 8 }}
+              >
                 Track Map Metric:
               </label>
-              <select value={selectedMapMetric} onChange={(e) => setSelectedMapMetric(e.target.value)}>
+              <select
+                value={selectedMapMetric}
+                onChange={(e) => setSelectedMapMetric(e.target.value)}
+              >
                 {metrics.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             </div>
@@ -261,7 +314,7 @@ export default function TelemetryViewer() {
                 background: "white",
                 border: "1px solid #ccc",
                 cursor: "pointer",
-                position: "relative"
+                position: "relative",
               }}
               onMouseMove={(e) => {
                 const rect = containerRef.current.getBoundingClientRect();
@@ -271,45 +324,73 @@ export default function TelemetryViewer() {
                 setHoverIndex(findClosestIndex(x, y));
               }}
               onMouseLeave={() => setHoverIndex(null)}
-            >            
-              {//UNCOMMENT THIS TO USES GOOGLE MAP API IMAGE BEHIND SVG TRACK
-              /* <GoogleTrackMap
+            >
+              {
+                //UNCOMMENT THIS TO USES GOOGLE MAP API IMAGE BEHIND SVG TRACK
+                /* <GoogleTrackMap
               latRange={latRange}
               lonRange={lonRange}
               width={width}
               height={height}
               apiKey={GOOGLE_MAPS_API_KEY}
-              /> */}
-                <svg
-                  width={width}
-                  height={height}
-                  style={{
-                    position: "relative", // <----- Change this to "absolute" to set it above google maps image
-                    top: 0,
-                    left: 0,
-                    zIndex: 1,
-                    pointerEvents: "none",
-                  }}
-                > 
+              /> */
+              }
+              <svg
+                width={width}
+                height={height}
+                style={{
+                  position: "relative", // <----- Change this to "absolute" to set it above google maps image
+                  top: 0,
+                  left: 0,
+                  zIndex: 1,
+                  pointerEvents: "none",
+                }}
+              >
                 {/* Start/Finish marker */}
-                {racer1Data.length > 0 && (() => {
-                  const [startX, startY] = project(racer1Data[0].Lon, racer1Data[0].Lat);
-                  return (
-                    <g>
-                      <circle cx={startX} cy={startY} r={4} fill="black" />
-                      <text x={startX + 6} y={startY - 6} fontSize="10" fill="gold" fontWeight="bold">
-                        🏁Start / Finish🏁
-                      </text>
-                    </g>
-                  );
-                })()}
-                
+                {racer1Data.length > 0 &&
+                  (() => {
+                    const [startX, startY] = project(
+                      racer1Data[0].Lon,
+                      racer1Data[0].Lat,
+                    );
+                    return (
+                      <g>
+                        <circle cx={startX} cy={startY} r={4} fill="black" />
+                        <text
+                          x={startX + 6}
+                          y={startY - 6}
+                          fontSize="10"
+                          fill="gold"
+                          fontWeight="bold"
+                        >
+                          🏁Start / Finish🏁
+                        </text>
+                      </g>
+                    );
+                  })()}
+
                 {/* Connecting line (e.g. lap trace) */}
-                {racer1Data.length > 1 && (() => {
-                  const [x1, y1] = project(racer1Data[0].Lon, racer1Data[0].Lat);
-                  const [x2, y2] = project(racer1Data[racer1Data.length - 1].Lon, racer1Data[racer1Data.length - 1].Lat);
-                  return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="green" strokeWidth={2} />;
-                })()}
+                {racer1Data.length > 1 &&
+                  (() => {
+                    const [x1, y1] = project(
+                      racer1Data[0].Lon,
+                      racer1Data[0].Lat,
+                    );
+                    const [x2, y2] = project(
+                      racer1Data[racer1Data.length - 1].Lon,
+                      racer1Data[racer1Data.length - 1].Lat,
+                    );
+                    return (
+                      <line
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="green"
+                        strokeWidth={2}
+                      />
+                    );
+                  })()}
 
                 {/* All telemetry points rendered as colored dots */}
                 {allData.map((p, i) => {
@@ -320,7 +401,12 @@ export default function TelemetryViewer() {
 
                 {/* Hover markers for both racers */}
                 {hoverIndex !== null &&
-                  renderDualTelemetryCursor(hoverIndex, racer1Data, racer2Data, project)}
+                  renderDualTelemetryCursor(
+                    hoverIndex,
+                    racer1Data,
+                    racer2Data,
+                    project,
+                  )}
               </svg>
               {hoveredTime !== null && (
                 <div
@@ -350,20 +436,94 @@ export default function TelemetryViewer() {
               />
 
               {/* Legend */}
-              <div style={{ position: "absolute", bottom: 10, left: 10, background: "#fff", padding: "4px 8px", border: "1px solid #ccc", fontSize: 12 }}>
-                <div><span style={{ display: "inline-block", width: 12, height: 12, background: "red", marginRight: 4 }}></span>{rangeHigh}</div>
-                <div><span style={{ display: "inline-block", width: 12, height: 12, background: "orange", marginRight: 4 }}></span>{rangeMid}</div>
-                <div><span style={{ display: "inline-block", width: 12, height: 12, background: "yellow", marginRight: 4 }}></span>{rangeLow}</div>
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 10,
+                  left: 10,
+                  background: "#fff",
+                  padding: "4px 8px",
+                  border: "1px solid #ccc",
+                  fontSize: 12,
+                }}
+              >
+                <div>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      background: "red",
+                      marginRight: 4,
+                    }}
+                  ></span>
+                  {rangeHigh}
+                </div>
+                <div>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      background: "orange",
+                      marginRight: 4,
+                    }}
+                  ></span>
+                  {rangeMid}
+                </div>
+                <div>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      background: "yellow",
+                      marginRight: 4,
+                    }}
+                  ></span>
+                  {rangeLow}
+                </div>
               </div>
 
-              <div style={{ position: "absolute", top: 10, left: 10, fontSize: 12 }}>
-                <div style={{ color: "white" }}><span style={{ display: "inline-block", width: 12, height: 12, background: "blue", marginRight: 4 }}></span>Player 1</div>
-                <div style={{ color: "white" }}><span style={{ display: "inline-block", width: 12, height: 12, background: "green", marginRight: 4 }}></span>Player 2</div>
+              <div
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ color: "white" }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      background: "blue",
+                      marginRight: 4,
+                    }}
+                  ></span>
+                  Player 1
+                </div>
+                <div style={{ color: "white" }}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 12,
+                      height: 12,
+                      background: "green",
+                      marginRight: 4,
+                    }}
+                  ></span>
+                  Player 2
+                </div>
               </div>
 
               {/* Toggle focus between racers */}
               <button
-                onClick={() => setFocus(focus === "racer1" ? "racer2" : "racer1")}
+                onClick={() =>
+                  setFocus(focus === "racer1" ? "racer2" : "racer1")
+                }
                 style={{
                   position: "absolute",
                   bottom: 10,
@@ -372,7 +532,7 @@ export default function TelemetryViewer() {
                   background: "#444",
                   color: "white",
                   border: "none",
-                  borderRadius: 4
+                  borderRadius: 4,
                 }}
               >
                 Switch Focus ({focus === "racer1" ? "Racer 1" : "Racer 2"})
@@ -387,19 +547,25 @@ export default function TelemetryViewer() {
         {metrics && (
           <>
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 14, fontWeight: "bold", marginRight: 8 }}>
+              <label
+                style={{ fontSize: 14, fontWeight: "bold", marginRight: 8 }}
+              >
                 Graph Metrics:
               </label>
               <select
                 multiple
                 value={selectedGraphMetrics}
                 onChange={(e) =>
-                  setSelectedGraphMetrics(Array.from(e.target.selectedOptions, (o) => o.value))
+                  setSelectedGraphMetrics(
+                    Array.from(e.target.selectedOptions, (o) => o.value),
+                  )
                 }
                 style={{ minWidth: 200, height: 100 }}
               >
                 {metrics.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             </div>
@@ -463,9 +629,10 @@ function DualMetricGraph({ metric, hoverIndex, racer1Data, racer2Data }) {
     }
     if (xAxisRef.current) {
       d3.select(xAxisRef.current).call(
-        d3.axisBottom(x)
+        d3
+          .axisBottom(x)
           .ticks(8)
-          .tickFormat((d) => `${(d * 100).toFixed(0)}%`)
+          .tickFormat((d) => `${(d * 100).toFixed(0)}%`),
       );
     }
   }, [x, y]);
@@ -477,7 +644,7 @@ function DualMetricGraph({ metric, hoverIndex, racer1Data, racer2Data }) {
       style={{
         marginBottom: "30px",
         background: "#f9f9f9",
-        border: "1px solid #ccc"
+        border: "1px solid #ccc",
       }}
     >
       <g ref={yAxisRef} transform={`translate(${padding},0)`} />
@@ -498,22 +665,24 @@ function DualMetricGraph({ metric, hoverIndex, racer1Data, racer2Data }) {
 
       {hoverIndex !== null && (
         <>
-          {cleanRacer1[hoverIndex] && isFinite(cleanRacer1[hoverIndex].LapDistPct) && (
-            <circle
-              cx={x(cleanRacer1[hoverIndex].LapDistPct)}
-              cy={y(cleanRacer1[hoverIndex][metric])}
-              r={4}
-              fill="blue"
-            />
-          )}
-          {cleanRacer2[hoverIndex] && isFinite(cleanRacer2[hoverIndex].LapDistPct) && (
-            <circle
-              cx={x(cleanRacer2[hoverIndex].LapDistPct)}
-              cy={y(cleanRacer2[hoverIndex][metric])}
-              r={4}
-              fill="green"
-            />
-          )}
+          {cleanRacer1[hoverIndex] &&
+            isFinite(cleanRacer1[hoverIndex].LapDistPct) && (
+              <circle
+                cx={x(cleanRacer1[hoverIndex].LapDistPct)}
+                cy={y(cleanRacer1[hoverIndex][metric])}
+                r={4}
+                fill="blue"
+              />
+            )}
+          {cleanRacer2[hoverIndex] &&
+            isFinite(cleanRacer2[hoverIndex].LapDistPct) && (
+              <circle
+                cx={x(cleanRacer2[hoverIndex].LapDistPct)}
+                cy={y(cleanRacer2[hoverIndex][metric])}
+                r={4}
+                fill="green"
+              />
+            )}
         </>
       )}
 
@@ -524,13 +693,16 @@ function DualMetricGraph({ metric, hoverIndex, racer1Data, racer2Data }) {
   );
 }
 
-
 // Gets display units for common metrics
 function getUnits(metric) {
   switch (metric) {
-    case "Speed": return "m/s";
-    case "Throttle": return "%";
-    case "RPM": return "rpm";
-    default: return "";
+    case "Speed":
+      return "m/s";
+    case "Throttle":
+      return "%";
+    case "RPM":
+      return "rpm";
+    default:
+      return "";
   }
 }
