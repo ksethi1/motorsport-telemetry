@@ -191,7 +191,15 @@ export default function TelemetryViewer() {
     racer1Data[0] &&
     Object.keys(racer1Data[0]).filter(
       (k) =>
-        typeof racer1Data[0][k] === "number" && !["Lon", "Lat"].includes(k),
+        typeof racer1Data[0][k] === "number" &&
+        ![
+          "Lon",
+          "Lat",
+          "PositionType",
+          "LapDistPct",
+          "Clutch",
+          "LatAccel",
+        ].includes(k),
     );
 
   // Color mapping for metric values on map
@@ -701,7 +709,15 @@ function getUnits(metric) {
     case "Throttle":
       return "%";
     case "RPM":
-      return "rpm";
+      return "Revs/min";
+    case "Brake":
+      return "%";
+    case "SteeringWheelAngle":
+      return "Degree";
+    case "Gear":
+      return "1-6";
+    case "LatAccel":
+      return "g's";
     default:
       return "";
   }
