@@ -21,6 +21,8 @@ const DATA_KEYS = [
   "ABSActive",
   "DRSActive",
   "LatAccel",
+  "LongAccel",
+  "VertAccel",
   "Yaw",
   "PositionType",
 ];
@@ -56,7 +58,11 @@ export default function TelemetryViewer() {
       Object.fromEntries(
         DATA_KEYS.map((key, i) => [
           key,
-          key === "Speed" ? row[i] * 2.24 : row[i], // Convert Speed from m/s to mph
+          key === "Speed"
+            ? row[i] * 2.24
+            : key === "SteeringWheelAngle"
+              ? row[i] * (180 / Math.PI)
+              : row[i], // Convert Speed from m/s to mph and SteeringWheelAngle from radians to degrees
         ]),
       ),
     );
@@ -198,7 +204,8 @@ export default function TelemetryViewer() {
           "PositionType",
           "LapDistPct",
           "Clutch",
-          "LatAccel",
+          "VertAccel",
+          "Yaw",
         ].includes(k),
     );
 
@@ -336,12 +343,12 @@ export default function TelemetryViewer() {
               {
                 //UNCOMMENT THIS TO USES GOOGLE MAP API IMAGE BEHIND SVG TRACK
                 /* <GoogleTrackMap
-              latRange={latRange}
-              lonRange={lonRange}
-              width={width}
-              height={height}
-              apiKey={GOOGLE_MAPS_API_KEY}
-              /> */
+                              latRange={latRange}
+                              lonRange={lonRange}
+                              width={width}
+                              height={height}
+                              apiKey={GOOGLE_MAPS_API_KEY}
+                              /> */
               }
               <svg
                 width={width}
@@ -716,8 +723,10 @@ function getUnits(metric) {
       return "Degree";
     case "Gear":
       return "1-6";
+    case "LongAccel":
+      return "m/s²";
     case "LatAccel":
-      return "g's";
+      return "m/s²";
     default:
       return "";
   }
