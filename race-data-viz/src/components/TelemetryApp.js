@@ -697,7 +697,7 @@ function DualMetricGraph({ metric, hoverIndex, racer1Data, racer2Data }) {
 function getUnits(metric) {
   switch (metric) {
     case "Speed":
-      return "m/s";
+      return "MPH";
     case "Throttle":
       return "%";
     case "RPM":
