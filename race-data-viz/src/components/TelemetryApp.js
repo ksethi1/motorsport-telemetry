@@ -4,7 +4,7 @@ import { renderDualTelemetryCursor } from "./TelemetryOverlap";
 import LapCompletionGraph from "./LinearCompletionGraph";
 import GoogleTrackMap from "./GoogleTrackMap";
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyCdY_AOMidRQlRFGNERsydJco0SXCx2mWg"; // <-- CHANGE TO YOUR API KEY (Joey)
+const GOOGLE_MAPS_API_KEY = "XXXXXXXXXXXX"; // <-- CHANGE TO YOUR API KEY (Joey)
 
 // Define keys to map raw telemetry array data to objects
 const DATA_KEYS = [
